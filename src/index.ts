@@ -1,3 +1,9 @@
+/**
+ * Reads a cookie value by name from `document.cookie`.
+ *
+ * This is a small internal helper used by the AuthGate browser SDK.
+ * It returns `null` if the cookie is not present.
+ */
 function getCookie(name: string): string | null {
   const match = document.cookie
     .split("; ")
@@ -5,22 +11,79 @@ function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match.split("=")[1]) : null;
 }
 
+/**
+ * Returns the AuthGate CSRF token from the browser cookies.
+ *
+ * The CSRF token is issued by AuthGate and stored in the `authgate_csrf`
+ * cookie. This helper does not validate the token; it only reads it.
+ *
+ * @returns The CSRF token string, or `null` if the cookie is missing.
+ */
 export function getCSRFToken(): string | null {
   return getCookie("authgate_csrf");
 }
 
-export async function logout(opts?: { redirectTo?: string }) {
+/**
+ * The result of a logout attempt.
+ *
+ * - `{ ok: true }` indicates that logout succeeded.
+ * - `{ ok: false, reason }` indicates that logout failed for a known reason.
+ */
+type LogoutResult =
+  | { ok: true }
+  | { ok: false; reason: "missing_csrf" | "request_failed" | "unauthorized" };
+
+/**
+ * Logs the user out by calling the AuthGate logout endpoint.
+ *
+ * This function:
+ * - Reads the CSRF token from the browser cookies
+ * - Sends a POST request to `/auth/logout`
+ * - Optionally redirects the browser on success
+ *
+ * Redirecting is a side-effect and does not define success. Applications
+ * that need to react to logout programmatically (e.g. SPA state updates)
+ * should inspect the returned result instead.
+ *
+ * @param opts.redirectTo Optional URL to redirect to after successful logout.
+ * @returns A `LogoutResult` indicating whether logout succeeded or failed.
+ */
+export async function logout(opts?: {
+  redirectTo?: string;
+}): Promise<LogoutResult> {
   const csrf = getCSRFToken();
 
-  await fetch("/auth/logout", {
-    method: "POST",
-    headers: {
-      "X-CSRF-Token": csrf ?? "",
-    },
-    credentials: "include",
-  });
+  if (!csrf) {
+    return { ok: false, reason: "missing_csrf" };
+  }
 
-  if (opts?.redirectTo !== undefined) {
+  let res: Response;
+
+  try {
+    res = await fetch("/auth/logout", {
+      method: "POST",
+      headers: {
+        "X-CSRF-Token": csrf,
+      },
+      credentials: "include",
+    });
+  } catch {
+    return { ok: false, reason: "request_failed" };
+  }
+
+  if (!res.ok) {
+    return {
+      ok: false,
+      reason:
+        res.status === 401 || res.status === 403
+          ? "unauthorized"
+          : "request_failed",
+    };
+  }
+
+  if (opts?.redirectTo) {
     window.location.href = opts.redirectTo;
   }
+
+  return { ok: true };
 }
