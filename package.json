@@ -1,6 +1,10 @@
 {
   "name": "@authgate/browser",
-  "version": "0.2.3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexlup06-authgate/authgate-browser.git"
+  },
+  "version": "0.2.0",
   "description": "Browser-side helpers for AuthGate (logout, CSRF forwarding)",
   "license": "MIT",
   "type": "module",
