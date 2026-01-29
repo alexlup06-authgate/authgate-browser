@@ -12,6 +12,8 @@ coupling and hidden behavior.
 
 - Read AuthGate CSRF token from cookies
 - Perform a safe logout request with CSRF protection
+- Explicit success/failure signaling
+- Optional redirect after logout
 - Zero dependencies
 - Framework-agnostic (works with React, Vue, vanilla JS, etc.)
 
@@ -37,6 +39,8 @@ const csrf = getCSRFToken();
 
 Returns the value of the `authgate_csrf` cookie, or `null` if not present.
 
+This function only **reads** the CSRF token. It does not generate or validate it.
+
 ---
 
 ### Logout
@@ -44,7 +48,7 @@ Returns the value of the `authgate_csrf` cookie, or `null` if not present.
 ```ts
 import { logout } from "@authgate/browser";
 
-await logout();
+const result = await logout();
 ```
 
 This will:
@@ -52,6 +56,17 @@ This will:
 - Send a `POST /auth/logout` request
 - Attach the CSRF token via `X-CSRF-Token`
 - Include credentials (`cookies`)
+
+The function returns a result indicating whether logout succeeded:
+
+```ts
+type LogoutResult =
+  | { ok: true }
+  | { ok: false; reason: "missing_csrf" | "request_failed" | "unauthorized" };
+```
+
+Applications that do not need to react programmatically to logout may safely
+ignore the return value.
 
 ---
 
@@ -61,7 +76,24 @@ This will:
 await logout({ redirectTo: "/" });
 ```
 
-After a successful logout request, the browser is redirected to the given path.
+If the logout request succeeds, the browser is redirected to the given path.
+
+Redirecting is an optional side-effect and does **not** define success.
+Applications may choose to handle navigation themselves instead.
+
+---
+
+### Example (React / SPA)
+
+```ts
+const result = await logout();
+
+if (result.ok) {
+  setUser(null);
+} else {
+  console.error("Logout failed:", result.reason);
+}
+```
 
 ---
 
@@ -80,7 +112,7 @@ No cookies are set, modified, or cleared by this library.
 - No authentication logic
 - No token refresh
 - No session management
-- No redirects except when explicitly requested
+- No implicit redirects
 - No framework-specific helpers
 
 This package exists solely to reduce boilerplate and prevent integration mistakes.
@@ -91,7 +123,6 @@ This package exists solely to reduce boilerplate and prevent integration mistake
 
 - Works with any backend protected by AuthGate
 - Compatible with SSR and SPA architectures
-- Safe to use in multi-app or monorepo setups
 
 ---
 
