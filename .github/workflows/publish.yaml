@@ -32,8 +32,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Authenticate npm (OIDC)
-        run: npm whoami
-
       - name: Publish to npm with Trusted Publisher
-        run: npm publish --provenance --access public
+        run: npm publish  --access public
