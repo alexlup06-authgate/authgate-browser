@@ -1,0 +1,23 @@
+{
+  "name": "@authgate/browser",
+  "version": "0.1.0",
+  "description": "Browser-side helpers for AuthGate (logout, CSRF forwarding)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
