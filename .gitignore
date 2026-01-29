@@ -12,6 +12,7 @@ pnpm-debug.log*
 /dist
 /.next
 /out
+*.tgz
 
 # =========================
 # Environment / Secrets
