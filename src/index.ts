@@ -89,27 +89,42 @@ export async function logout(opts?: {
 }
 
 /**
- * authFetch performs a fetch request with AuthGate-aware refresh-once behavior.
+ * authFetch performs a fetch request with AuthGate-aware, refresh-once behavior
+ * for a specific audience.
  *
  * Behavior:
  * - Always includes credentials
- * - If the response is NOT 401 - returns it directly
+ * - Performs the initial request as-is
+ * - If the response is NOT 401, returns it directly
  * - If the response IS 401:
- *   - Attempts POST /auth/refresh with CSRF
- *   - If refresh succeeds - retries original request ONCE
- *   - Otherwise - returns original 401 response
+ *   - Attempts POST /auth/refresh with CSRF and the same requested audience
+ *   - If refresh succeeds, retries the original request ONCE
+ *   - If refresh fails, returns the original 401 response
+ *
+ * authFetch never redirects or mutates application state. Callers are expected
+ * to handle authentication failures explicitly.
+ *
+ * @param input The resource to fetch (same as `fetch`).
+ * @param init Optional fetch options. Credentials are always included.
+ * @param opts Optional AuthGate options.
+ * @param opts.audience The audience for which the request is made (e.g. "app", "admin").
+ *        Defaults to "app".
+ * @returns The final `Response` from the original request or the retried request.
  */
+
 export async function authFetch(
   input: RequestInfo | URL,
   init: RequestInit = {},
+  opts?: { audience?: string },
 ): Promise<Response> {
-  const res = await fetch(input, withCredentials(init));
+  const audience = opts?.audience ?? "app";
 
+  const res = await fetch(input, withCredentials(init));
   if (res.status !== 401) {
     return res;
   }
 
-  const refreshed = await refreshSession();
+  const refreshed = await refreshSession(audience);
   if (!refreshed) {
     return res;
   }
@@ -125,17 +140,24 @@ function withCredentials(init: RequestInit): RequestInit {
 }
 
 /**
- * refreshSession attempts to refresh the current AuthGate session.
+ * refreshSession attempts to refresh the current AuthGate session for a
+ * specific audience.
  *
  * It performs:
  *   POST /auth/refresh
- *   with CSRF protection and credentials
+ *   with CSRF protection, credentials, and an explicit audience declaration.
  *
- * The function:
- * - returns true if refresh succeeded
- * - returns false if refresh failed for any reason
+ * The server validates the requested audience against the user's roles and
+ * rejects the request if the audience is not permitted.
+ *
+ * @param audience The audience for which a new access token should be minted.
+ *        Defaults to "app".
+ * @returns `true` if the refresh succeeded, or `false` if refresh failed for
+ *          any reason (unauthorized, expired session, or error).
  */
-export async function refreshSession(): Promise<boolean> {
+export async function refreshSession(
+  audience: string = "app",
+): Promise<boolean> {
   const csrf = getCSRFToken();
   if (!csrf) {
     return false;
@@ -144,13 +166,16 @@ export async function refreshSession(): Promise<boolean> {
   let res: Response;
 
   try {
-    res = await fetch("/auth/refresh", {
-      method: "POST",
-      headers: {
-        "X-CSRF-Token": csrf,
+    res = await fetch(
+      `/auth/refresh?audience=${encodeURIComponent(audience)}`,
+      {
+        method: "POST",
+        headers: {
+          "X-CSRF-Token": csrf,
+        },
+        credentials: "include",
       },
-      credentials: "include",
-    });
+    );
   } catch {
     return false;
   }

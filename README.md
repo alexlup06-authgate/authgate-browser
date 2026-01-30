@@ -24,7 +24,7 @@ framework-specific abstractions.
 
 - Read AuthGate CSRF token from browser cookies
 - Perform a CSRF-protected logout request
-- Explicit browser-side session refresh
+- Explicit browser-side session refresh **with audience selection**
 - Optional `fetch` wrapper with **single-retry refresh semantics**
 - Clear success / failure signaling
 - Optional redirect on logout
@@ -57,7 +57,7 @@ It does not generate or validate it.
 
 ---
 
-### Logout
+## Logout
 
 ```ts
 import { logout } from "@authgate/browser";
@@ -103,16 +103,28 @@ Redirecting is an optional side-effect and does **not** define success.
 ```ts
 import { refreshSession } from "@authgate/browser";
 
-const refreshed = await refreshSession();
+const refreshed = await refreshSession("app");
 ```
 
 Attempts to refresh the current AuthGate session by calling:
 
-```
+```text
 POST /auth/refresh
 ```
 
-Behavior:
+with an explicit **audience declaration**.
+
+### Audience
+
+The audience determines **which access token is minted** (e.g. `"app"`, `"admin"`).
+
+- The client explicitly requests an audience
+- AuthGate validates the requested audience against the user’s roles
+- Requests for unauthorized audiences fail with `401`
+
+If no audience is provided, `"app"` is used by default.
+
+### Behavior
 
 - Returns `true` if refresh succeeded
 - Returns `false` if refresh failed for any reason
@@ -141,16 +153,25 @@ const res = await authFetch("/api/data");
 `authFetch` is an **optional convenience wrapper** around `fetch` with
 AuthGate-aware refresh behavior.
 
-Behavior:
+### Behavior
 
 1. Performs the request with credentials
 2. If the response is **not `401`**, returns it directly
 3. If the response **is `401`**:
-   - Attempts `refreshSession()`
+   - Attempts `refreshSession()` with the same audience
    - If refresh succeeds, retries the original request **once**
    - Otherwise, returns the original `401` response
 
-Important properties:
+### Audience-aware requests
+
+```ts
+await authFetch("/admin/api/users", {}, { audience: "admin" });
+```
+
+- The same audience is used for the refresh attempt
+- Unauthorized audiences fail cleanly without retry loops
+
+### Important properties
 
 - At most **one retry**
 - No redirects
@@ -171,6 +192,16 @@ if (res.status === 401) {
 }
 ```
 
+Admin request:
+
+```ts
+const res = await authFetch(
+  "/admin/api/users",
+  {},
+  { audience: "admin" },
+);
+```
+
 ---
 
 ## Security model
@@ -179,6 +210,7 @@ if (res.status === 401) {
 - CSRF validation is **enforced by AuthGate**
 - Refresh tokens are **never exposed to JavaScript**
 - All authentication state is owned by AuthGate
+- Audiences are **explicitly requested and server-validated**
 
 This package only forwards existing browser state explicitly.
 
@@ -202,6 +234,7 @@ while preserving full application control.
 ## Compatibility
 
 - Works with any backend protected by AuthGate
+- Supports SSR, SPA, and hybrid architectures
 
 ---
 
