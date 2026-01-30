@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getCSRFToken, logout } from "./index";
+import { getCSRFToken, logout, refreshSession, authFetch } from "./index";
+
+/* -------------------- getCSRFToken -------------------- */
 
 describe("getCSRFToken", () => {
   beforeEach(() => {
@@ -15,6 +17,8 @@ describe("getCSRFToken", () => {
     expect(getCSRFToken()).toBeNull();
   });
 });
+
+/* -------------------- logout -------------------- */
 
 describe("logout", () => {
   beforeEach(() => {
@@ -42,9 +46,7 @@ describe("logout", () => {
 
     expect(fetch).toHaveBeenCalledWith("/auth/logout", {
       method: "POST",
-      headers: {
-        "X-CSRF-Token": "abc",
-      },
+      headers: { "X-CSRF-Token": "abc" },
       credentials: "include",
     });
 
@@ -79,5 +81,112 @@ describe("logout", () => {
     const result = await logout();
 
     expect(result).toEqual({ ok: false, reason: "unauthorized" });
+  });
+});
+
+/* -------------------- refreshSession -------------------- */
+
+describe("refreshSession", () => {
+  beforeEach(() => {
+    document.cookie = "authgate_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("returns false if CSRF token is missing", async () => {
+    const ok = await refreshSession();
+    expect(ok).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("returns true on successful refresh", async () => {
+    document.cookie = "authgate_csrf=abc";
+
+    (fetch as any).mockResolvedValue({
+      ok: true,
+      status: 200,
+    } as Response);
+
+    const ok = await refreshSession();
+
+    expect(fetch).toHaveBeenCalledWith("/auth/refresh", {
+      method: "POST",
+      headers: { "X-CSRF-Token": "abc" },
+      credentials: "include",
+    });
+
+    expect(ok).toBe(true);
+  });
+
+  it("returns false on failed refresh", async () => {
+    document.cookie = "authgate_csrf=abc";
+
+    (fetch as any).mockResolvedValue({
+      ok: false,
+      status: 401,
+    } as Response);
+
+    const ok = await refreshSession();
+    expect(ok).toBe(false);
+  });
+});
+
+/* -------------------- authFetch -------------------- */
+
+describe("authFetch", () => {
+  beforeEach(() => {
+    document.cookie = "authgate_csrf=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("returns response if request succeeds", async () => {
+    (fetch as any).mockResolvedValue({
+      status: 200,
+    } as Response);
+
+    const res = await authFetch("/api/data");
+
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 401 if refresh fails", async () => {
+    document.cookie = "authgate_csrf=abc";
+
+    (fetch as any)
+      .mockResolvedValueOnce({
+        status: 401,
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+      } as Response);
+
+    const res = await authFetch("/api/data");
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(res.status).toBe(401);
+  });
+
+  it("retries request once if refresh succeeds", async () => {
+    document.cookie = "authgate_csrf=abc";
+
+    (fetch as any)
+      .mockResolvedValueOnce({
+        status: 401,
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+      } as Response)
+      .mockResolvedValueOnce({
+        status: 200,
+      } as Response);
+
+    const res = await authFetch("/api/data");
+
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(res.status).toBe(200);
   });
 });

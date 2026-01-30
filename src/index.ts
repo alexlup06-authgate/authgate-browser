@@ -87,3 +87,73 @@ export async function logout(opts?: {
 
   return { ok: true };
 }
+
+/**
+ * authFetch performs a fetch request with AuthGate-aware refresh-once behavior.
+ *
+ * Behavior:
+ * - Always includes credentials
+ * - If the response is NOT 401 - returns it directly
+ * - If the response IS 401:
+ *   - Attempts POST /auth/refresh with CSRF
+ *   - If refresh succeeds - retries original request ONCE
+ *   - Otherwise - returns original 401 response
+ */
+export async function authFetch(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  const res = await fetch(input, withCredentials(init));
+
+  if (res.status !== 401) {
+    return res;
+  }
+
+  const refreshed = await refreshSession();
+  if (!refreshed) {
+    return res;
+  }
+
+  return fetch(input, withCredentials(init));
+}
+
+function withCredentials(init: RequestInit): RequestInit {
+  return {
+    ...init,
+    credentials: "include",
+  };
+}
+
+/**
+ * refreshSession attempts to refresh the current AuthGate session.
+ *
+ * It performs:
+ *   POST /auth/refresh
+ *   with CSRF protection and credentials
+ *
+ * The function:
+ * - returns true if refresh succeeded
+ * - returns false if refresh failed for any reason
+ */
+export async function refreshSession(): Promise<boolean> {
+  const csrf = getCSRFToken();
+  if (!csrf) {
+    return false;
+  }
+
+  let res: Response;
+
+  try {
+    res = await fetch("/auth/refresh", {
+      method: "POST",
+      headers: {
+        "X-CSRF-Token": csrf,
+      },
+      credentials: "include",
+    });
+  } catch {
+    return false;
+  }
+
+  return res.ok;
+}
