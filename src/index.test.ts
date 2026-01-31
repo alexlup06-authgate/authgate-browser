@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { getCSRFToken, logout, refreshSession, authFetch } from "./index";
+import {
+  getCSRFToken,
+  logout,
+  refreshSession,
+  authFetch,
+  getCurrentUser,
+} from "./index";
 
 /* -------------------- getCSRFToken -------------------- */
 
@@ -221,5 +227,144 @@ describe("authFetch", () => {
       expect.any(Object),
     );
     expect(res.status).toBe(200);
+  });
+});
+
+/* -------------------- getCurrentUser -------------------- */
+
+describe("getCurrentUser", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("returns user when request succeeds", async () => {
+    (fetch as any).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: "user-1",
+        email: "user@example.com",
+        username: "user",
+      }),
+    } as Response);
+
+    const user = await getCurrentUser();
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/auth/user",
+      expect.objectContaining({ credentials: "include" }),
+    );
+
+    expect(user).toEqual({
+      id: "user-1",
+      email: "user@example.com",
+      username: "user",
+    });
+  });
+
+  it("returns null if user is not authenticated (401)", async () => {
+    (fetch as any).mockResolvedValue({
+      ok: false,
+      status: 401,
+    } as Response);
+
+    const user = await getCurrentUser();
+    expect(user).toBeNull();
+  });
+
+  it("attempts refresh once if initial request is 401 and succeeds", async () => {
+    document.cookie = "authgate_csrf=abc";
+
+    (fetch as any)
+      // initial /auth/user
+      .mockResolvedValueOnce({ status: 401 } as Response)
+      // refresh
+      .mockResolvedValueOnce({ ok: true, status: 200 } as Response)
+      // retry /auth/user
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: "user-2",
+          email: "refreshed@example.com",
+          username: "refreshed",
+        }),
+      } as Response);
+
+    const user = await getCurrentUser();
+
+    expect(fetch).toHaveBeenCalledTimes(3);
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      "/auth/refresh?audience=app",
+      expect.any(Object),
+    );
+
+    expect(user).toEqual({
+      id: "user-2",
+      email: "refreshed@example.com",
+      username: "refreshed",
+    });
+  });
+
+  it("returns null if refresh fails after 401", async () => {
+    document.cookie = "authgate_csrf=abc";
+
+    (fetch as any)
+      // initial /auth/user
+      .mockResolvedValueOnce({ status: 401 } as Response)
+      // refresh fails
+      .mockResolvedValueOnce({ ok: false, status: 401 } as Response);
+
+    const user = await getCurrentUser();
+    expect(user).toBeNull();
+  });
+
+  it("returns null if response JSON is malformed", async () => {
+    (fetch as any).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new Error("bad json");
+      },
+    } as unknown as Response);
+
+    const user = await getCurrentUser();
+    expect(user).toBeNull();
+  });
+
+  it("passes explicit audience to refresh via authFetch", async () => {
+    document.cookie = "authgate_csrf=abc";
+
+    (fetch as any)
+      // initial /auth/user
+      .mockResolvedValueOnce({ status: 401 } as Response)
+      // refresh (admin audience)
+      .mockResolvedValueOnce({ ok: true, status: 200 } as Response)
+      // retry /auth/user
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: "admin-1",
+          email: "admin@example.com",
+          username: "admin",
+        }),
+      } as Response);
+
+    const user = await getCurrentUser({ audience: "admin" });
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      "/auth/refresh?audience=admin",
+      expect.any(Object),
+    );
+
+    expect(user).toEqual({
+      id: "admin-1",
+      email: "admin@example.com",
+      username: "admin",
+    });
   });
 });

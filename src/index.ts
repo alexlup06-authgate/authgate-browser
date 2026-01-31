@@ -182,3 +182,52 @@ export async function refreshSession(
 
   return res.ok;
 }
+
+export type CurrentUser = {
+  id: string;
+  email: string;
+  username: string;
+};
+
+/**
+ * Fetches the currently authenticated user's identity.
+ *
+ * Behavior:
+ * - Calls GET /auth/user using credentials (cookies)
+ * - If the access token is expired, authFetch attempts a single refresh
+ * - If refresh succeeds, the request is retried once
+ * - If the user is not authenticated, returns null
+ *
+ * This function never throws for authentication failures.
+ *
+ * @param opts Optional options.
+ * @param opts.audience The audience for which authentication should be ensured
+ *        (e.g. "app", "admin"). Defaults to "app".
+ *
+ * @returns The current user object if authenticated, or `null` otherwise.
+ */
+export async function getCurrentUser(opts?: {
+  audience?: string;
+}): Promise<CurrentUser | null> {
+  let res: Response;
+
+  try {
+    res = await authFetch(
+      "/auth/user",
+      { method: "GET" },
+      { audience: opts?.audience ?? "app" },
+    );
+  } catch {
+    return null;
+  }
+
+  if (!res.ok) {
+    return null;
+  }
+
+  try {
+    return (await res.json()) as CurrentUser;
+  } catch {
+    return null;
+  }
+}
