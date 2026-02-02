@@ -187,6 +187,12 @@ export type CurrentUser = {
   id: string;
   email: string;
   username: string;
+
+  /** Whether the user account is disabled */
+  disabled: boolean;
+
+  /** Account creation time (ISO 8601) */
+  created_at: string; // ISO timestamp
 };
 
 /**
@@ -218,6 +224,10 @@ export async function getCurrentUser(opts?: {
       { audience: opts?.audience ?? "app" },
     );
   } catch {
+    return null;
+  }
+
+  if (res.status === 401) {
     return null;
   }
 
