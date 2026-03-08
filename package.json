@@ -4,7 +4,7 @@
     "type": "git",
     "url": "https://github.com/authara/authara-browser.git"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Browser-side helpers for Authara (logout, CSRF forwarding)",
   "license": "MIT",
   "type": "module",
