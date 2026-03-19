@@ -188,7 +188,7 @@ describe("authFetch", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch).toHaveBeenNthCalledWith(
       2,
-      "/auth/refresh?audience=app",
+      "/auth/sessions/refresh?audience=app",
       expect.any(Object),
     );
     expect(res.status).toBe(401);
@@ -223,7 +223,7 @@ describe("authFetch", () => {
 
     expect(fetch).toHaveBeenNthCalledWith(
       2,
-      "/auth/refresh?audience=admin",
+      "/auth/sessions/refresh?audience=admin",
       expect.any(Object),
     );
     expect(res.status).toBe(200);
@@ -297,7 +297,7 @@ describe("getCurrentUser", () => {
 
     expect(fetch).toHaveBeenNthCalledWith(
       2,
-      "/auth/refresh?audience=app",
+      "/auth/sessions/refresh?audience=app",
       expect.any(Object),
     );
 
@@ -357,7 +357,7 @@ describe("getCurrentUser", () => {
 
     expect(fetch).toHaveBeenNthCalledWith(
       2,
-      "/auth/refresh?audience=admin",
+      "/auth/sessions/refresh?audience=admin",
       expect.any(Object),
     );
 

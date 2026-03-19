@@ -97,7 +97,7 @@ export async function logout(opts?: {
  * - Performs the initial request as-is
  * - If the response is NOT 401, returns it directly
  * - If the response IS 401:
- *   - Attempts POST /auth/refresh with CSRF and the same requested audience
+ *   - Attempts POST /auth/sessions/refresh with CSRF and the same requested audience
  *   - If refresh succeeds, retries the original request ONCE
  *   - If refresh fails, returns the original 401 response
  *
