@@ -114,7 +114,7 @@ describe("refreshSession", () => {
 
     const ok = await refreshSession("app");
 
-    expect(fetch).toHaveBeenCalledWith("/auth/refresh?audience=app", {
+    expect(fetch).toHaveBeenCalledWith("/auth/sessions/refresh?audience=app", {
       method: "POST",
       headers: { "X-CSRF-Token": "abc" },
       credentials: "include",
@@ -133,7 +133,7 @@ describe("refreshSession", () => {
 
     const ok = await refreshSession("admin");
 
-    expect(fetch).toHaveBeenCalledWith("/auth/refresh?audience=admin", {
+    expect(fetch).toHaveBeenCalledWith("/auth/sessions/refresh?audience=admin", {
       method: "POST",
       headers: { "X-CSRF-Token": "abc" },
       credentials: "include",

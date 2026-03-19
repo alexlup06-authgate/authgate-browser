@@ -143,7 +143,7 @@ function withCredentials(init: RequestInit): RequestInit {
  * specific audience.
  *
  * It performs:
- *   POST /auth/refresh
+ *   POST /auth/sessions/refresh
  *   with CSRF protection, credentials, and an explicit audience declaration.
  *
  * The server validates the requested audience against the user's roles and
@@ -166,7 +166,7 @@ export async function refreshSession(
 
   try {
     res = await fetch(
-      `/auth/refresh?audience=${encodeURIComponent(audience)}`,
+      `/auth/sessions/refresh?audience=${encodeURIComponent(audience)}`,
       {
         method: "POST",
         headers: {
